@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "one-life-one-button",
-    "slug": "one-life-one-button",
+    "name": "Tower Up",
+    "slug": "tower-up",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "onelifeonebutton",
+    "scheme": "towerup",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
@@ -43,6 +43,12 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "b0dfd008-7aee-4c80-a5c3-5a86a8b87936"
+      }
     }
   }
 }
