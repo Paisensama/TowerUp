@@ -1,3 +1,4 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Haptics from "expo-haptics";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -47,6 +48,7 @@ const GRAVITY = 0.34;
 const FLOAT_LIFE_START = 52;
 const HIDE_STAND_AT = 12;
 const CAKE_COLORS = ["#f8bbd0", "#ffe0b2", "#dcedc8", "#d1c4e9", "#ffccbc"];
+const BEST_SCORE_KEY = "towerup.bestScore";
 
 type DifficultyKey = "easy" | "normal" | "hard";
 type ThemeKey = "aurora" | "neon" | "sunset";
@@ -162,6 +164,10 @@ export default function CakeTowerGame() {
   const sliceIdRef = useRef(0);
   const floatTextIdRef = useRef(0);
   const shakeX = useRef(new Animated.Value(0)).current;
+  const scoreScale = useRef(new Animated.Value(1)).current;
+  const placedLayerAnim = useRef(new Animated.Value(1)).current;
+  const [lastPlacedIndex, setLastPlacedIndex] = useState<number | null>(null);
+  const hasLoadedBestScore = useRef(false);
   const currentDifficulty = DIFFICULTY_CONFIG[difficulty];
   const currentTheme = THEMES[theme];
   const visibleStack = useMemo(
@@ -258,6 +264,53 @@ export default function CakeTowerGame() {
   }, [direction, phase, screenHeight, screenWidth, speed]);
 
   useEffect(() => {
+    let isMounted = true;
+    AsyncStorage.getItem(BEST_SCORE_KEY)
+      .then((value) => {
+        if (!isMounted || value === null) {
+          return;
+        }
+        const parsed = Number.parseInt(value, 10);
+        if (!Number.isNaN(parsed)) {
+          setBestScore(parsed);
+        }
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (isMounted) {
+          hasLoadedBestScore.current = true;
+        }
+      });
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!hasLoadedBestScore.current) {
+      return;
+    }
+    AsyncStorage.setItem(BEST_SCORE_KEY, String(bestScore)).catch(() => {});
+  }, [bestScore]);
+
+  useEffect(() => {
+    Animated.sequence([
+      Animated.timing(scoreScale, {
+        toValue: 1.08,
+        duration: 120,
+        easing: Easing.out(Easing.quad),
+        useNativeDriver: true,
+      }),
+      Animated.timing(scoreScale, {
+        toValue: 1,
+        duration: 160,
+        easing: Easing.out(Easing.quad),
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [score, scoreScale]);
+
+  useEffect(() => {
     const nextInitial = makeInitialState(screenWidth, screenHeight);
     setStack([nextInitial.baseLayer]);
     setMoving(nextInitial.movingLayer);
@@ -270,6 +323,7 @@ export default function CakeTowerGame() {
     setPerfectHit(false);
     setFloatingTexts([]);
     setTheme((prev) => pickRandomTheme(prev));
+    setLastPlacedIndex(null);
   }, [difficulty, screenWidth, screenHeight]);
 
   const reset = () => {
@@ -285,6 +339,7 @@ export default function CakeTowerGame() {
     setPerfectHit(false);
     setFloatingTexts([]);
     setTheme((prev) => pickRandomTheme(prev));
+    setLastPlacedIndex(null);
   };
 
   const start = () => {
@@ -453,6 +508,14 @@ export default function CakeTowerGame() {
       Math.min(prev + currentDifficulty.speedStep, currentDifficulty.maxSpeed)
     );
     setDirection(nextDirection);
+    setLastPlacedIndex(nextStack.length - 1);
+    placedLayerAnim.setValue(0);
+    Animated.timing(placedLayerAnim, {
+      toValue: 1,
+      duration: 220,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
   };
 
   const onPress = () => {
@@ -511,7 +574,16 @@ export default function CakeTowerGame() {
         )}
 
         <View style={styles.hudCard}>
-          <Text style={styles.scoreText}>{score}</Text>
+          <Animated.Text
+            style={[
+              styles.scoreText,
+              {
+                transform: [{ scale: scoreScale }],
+              },
+            ]}
+          >
+            {score}
+          </Animated.Text>
           <Text style={styles.bestText}>Best: {bestScore}</Text>
           <Text style={styles.comboText}>
             Combo: {perfectStreak} | Multiplier: x{1 + Math.floor(perfectStreak / 3)}
@@ -625,22 +697,45 @@ export default function CakeTowerGame() {
           </View>
         )}
 
-        {visibleStack.map((layer, i) => (
-          <View
-            key={`layer-${i}`}
-            style={[
-              styles.layer,
-              {
-                left: layer.x,
-                top: layer.y,
-                width: layer.width,
-                backgroundColor: layer.color,
-              },
-            ]}
-          >
-            <View style={styles.icing} />
-          </View>
-        ))}
+        {visibleStack.map((layer, i) => {
+          const isLast = i === lastPlacedIndex;
+          const animatedStyle = isLast
+            ? {
+                transform: [
+                  {
+                    translateY: placedLayerAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [-8, 0],
+                    }),
+                  },
+                  {
+                    scale: placedLayerAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [0.98, 1],
+                    }),
+                  },
+                ],
+              }
+            : undefined;
+          const LayerComponent = isLast ? Animated.View : View;
+          return (
+            <LayerComponent
+              key={`layer-${i}`}
+              style={[
+                styles.layer,
+                animatedStyle,
+                {
+                  left: layer.x,
+                  top: layer.y,
+                  width: layer.width,
+                  backgroundColor: layer.color,
+                },
+              ]}
+            >
+              <View style={styles.icing} />
+            </LayerComponent>
+          );
+        })}
 
         {phase !== "gameover" && (
           <View
