@@ -164,7 +164,6 @@ export default function CakeTowerGame() {
   const sliceIdRef = useRef(0);
   const floatTextIdRef = useRef(0);
   const shakeX = useRef(new Animated.Value(0)).current;
-  const scoreScale = useRef(new Animated.Value(1)).current;
   const placedLayerAnim = useRef(new Animated.Value(1)).current;
   const [lastPlacedIndex, setLastPlacedIndex] = useState<number | null>(null);
   const hasLoadedBestScore = useRef(false);
@@ -292,23 +291,6 @@ export default function CakeTowerGame() {
     }
     AsyncStorage.setItem(BEST_SCORE_KEY, String(bestScore)).catch(() => {});
   }, [bestScore]);
-
-  useEffect(() => {
-    Animated.sequence([
-      Animated.timing(scoreScale, {
-        toValue: 1.08,
-        duration: 120,
-        easing: Easing.out(Easing.quad),
-        useNativeDriver: true,
-      }),
-      Animated.timing(scoreScale, {
-        toValue: 1,
-        duration: 160,
-        easing: Easing.out(Easing.quad),
-        useNativeDriver: true,
-      }),
-    ]).start();
-  }, [score, scoreScale]);
 
   useEffect(() => {
     const nextInitial = makeInitialState(screenWidth, screenHeight);
@@ -574,16 +556,7 @@ export default function CakeTowerGame() {
         )}
 
         <View style={styles.hudCard}>
-          <Animated.Text
-            style={[
-              styles.scoreText,
-              {
-                transform: [{ scale: scoreScale }],
-              },
-            ]}
-          >
-            {score}
-          </Animated.Text>
+          <Text style={styles.scoreText}>{score}</Text>
           <Text style={styles.bestText}>Best: {bestScore}</Text>
           <Text style={styles.comboText}>
             Combo: {perfectStreak} | Multiplier: x{1 + Math.floor(perfectStreak / 3)}
